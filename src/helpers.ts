@@ -442,8 +442,8 @@ export function ensureValidSize(stageType: StageType, participantCount: number):
     if (participantCount < 2)
         throw Error('Impossible to create a stage with less than 2 participants.');
 
-    if (stageType === 'round_robin') {
-        // Round robin supports any number of participants.
+    if (stageType === 'round_robin' || stageType === 'swiss') {
+        // Round robin and swiss supports any number of participants.
         return;
     }
 

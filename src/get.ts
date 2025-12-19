@@ -1,5 +1,5 @@
 import { Stage, Group, Round, Match, MatchGame, Participant, Status, Id, RankingItem } from 'brackets-model';
-import { Database, FinalStandingsItem, ParticipantSlot, type RoundRobinFinalStandingsItem, type RoundRobinFinalStandingsOptions } from './types';
+import { Database, FinalStandingsItem, FinalStandingsOptions, ParticipantSlot, SwissFinalStandingsOptions, type RoundRobinFinalStandingsItem, type RoundRobinFinalStandingsOptions } from './types';
 import { BaseGetter } from './base/getter';
 import * as helpers from './helpers';
 
@@ -217,36 +217,37 @@ export class Get extends BaseGetter {
      * @param stageId ID of the stage.
      * @param rankingFormula The formula to compute the points for the ranking.
      */
-    public async finalStandings(stageId: Id, roundRobinOptions: RoundRobinFinalStandingsOptions): Promise<RankingItem[]>;
+    public async finalStandings(stageId: Id, finalStandingsOptions: FinalStandingsOptions): Promise<RankingItem[]>;
     // eslint-disable-next-line jsdoc/require-jsdoc
-    public async finalStandings(stageId: Id, roundRobinOptions?: RoundRobinFinalStandingsOptions): Promise<FinalStandingsItem[] | RankingItem[]> {
+    public async finalStandings(stageId: Id, finalStandingsOptions?: FinalStandingsOptions): Promise<FinalStandingsItem[] | RankingItem[]> {
         const stage = await this.storage.select('stage', stageId);
         if (!stage) throw Error('Stage not found.');
 
         switch (stage.type) {
             case 'round_robin': {
-                if (!roundRobinOptions)
+                // comprueba que finalStandigns exista y que sea de tipo round robin
+                if (!finalStandingsOptions || finalStandingsOptions.type !== 'round_robin')
                     throw Error('Round-robin options are required for round-robin stages.');
 
-                return this.roundRobinStandings(stage, roundRobinOptions);
+                return this.roundRobinStandings(stage, finalStandingsOptions);
             }
             case 'single_elimination': {
-                if (roundRobinOptions)
+                if (finalStandingsOptions)
                     throw Error('Round-robin options are not supported for elimination stages.');
 
                 return this.singleEliminationStandings(stage);
             }
             case 'double_elimination': {
-                if (roundRobinOptions)
+                if (finalStandingsOptions)
                     throw Error('Round-robin options are not supported for elimination stages.');
 
                 return this.doubleEliminationStandings(stage);
             }
             case 'swiss': {
-                if (roundRobinOptions)
-                    throw Error('Round-robin options are not supported for swiss stages.');
+                if (!finalStandingsOptions || finalStandingsOptions.type !== 'swiss')
+                    throw Error('Swiss options are required for swiss stages.');
 
-                return this.swissStandings(stage);
+                return this.swissStandings(stage, finalStandingsOptions);
             }
             default:
                 throw Error('Unknown stage type.');
@@ -258,52 +259,21 @@ export class Get extends BaseGetter {
      *
      * @param stage The stage.
      */
-    private async swissStandings(stage: Stage): Promise<FinalStandingsItem[]> {
+    private async swissStandings(stage: Stage, swissFinalStandingsOptions: SwissFinalStandingsOptions): Promise<FinalStandingsItem[]> {
         const matches = await this.storage.select('match', { stage_id: stage.id });
         if (!matches) throw Error('Error getting matches.');
 
         const participants = await this.storage.select('participant', { tournament_id: stage.tournament_id });
         if (!participants) throw Error('Error getting participants.');
 
-        // Calculate scores
-        const scores = new Map<Id, number>();
-        participants.forEach(p => scores.set(p.id, 0));
+        const ranking = helpers.getRanking(matches, swissFinalStandingsOptions.rankingFormula);
 
-        matches.forEach(match => {
-            if (!helpers.isMatchCompleted(match)) return;
-
-            const winner = helpers.getWinner(match);
-            if (winner && winner.id !== null) {
-                const current = scores.get(winner.id) || 0;
-                scores.set(winner.id, current + 1); // Win = 1 point
-            } else {
-                // Draw? 0.5?
-                // For now assuming Win/Loss.
-                // If draw logic exists, implement it. `getWinner` returns null for draw.
-                // But `isMatchCompleted` returns true for draw.
-                // If draw, split points?
-                if (helpers.isMatchDrawCompleted(match)) {
-                    // Check if opponents exist
-                    if (match.opponent1?.id != null) scores.set(match.opponent1.id, (scores.get(match.opponent1.id) || 0) + 0.5);
-                    if (match.opponent2?.id != null) scores.set(match.opponent2.id, (scores.get(match.opponent2.id) || 0) + 0.5);
-                }
-            }
-        });
-
-        const ranking = participants.map(p => ({
-            id: p.id,
-            name: p.name,
-            rank: 0, // Assigned later
-            score: scores.get(p.id) || 0,
+        const unsortedRanking = ranking.map(item => ({
+            ...item,
+            name: helpers.findParticipant(participants, item).name,
         }));
 
-        // Sort by score descending
-        ranking.sort((a, b) => b.score - a.score);
-
-        // Assign rank
-        ranking.forEach((item, index) => item.rank = index + 1);
-
-        return ranking;
+        return unsortedRanking.sort((a, b) => b.rank - a.rank);
     }
 
     /**

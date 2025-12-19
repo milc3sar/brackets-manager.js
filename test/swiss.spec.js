@@ -166,10 +166,53 @@ describe('Swiss System', () => {
 
         // With 6 participants, log2(6) is ~2.58 -> 3 rounds.
         // After 3 rounds, we should check standings.
-        const standings = await manager.get.finalStandings(stage.id);
+        const standings = await manager.get.finalStandings(stage.id, {
+            type: 'swiss',
+            rankingFormula: item => item.wins + 0.5 * item.draws,
+        });
         console.log('Final Standings:', JSON.stringify(standings, null, 2));
         expect(standings.length).to.equal(6);
         // 6 Real participants + 2 BYEs. 
         // Standings usually filters out BYEs if mapped to participants?
+    });
+
+    it('should throw if round count is less than 3', async () => {
+        await expect(manager.create.stage({
+            name: 'Swiss Short',
+            tournamentId: 0,
+            type: 'swiss',
+            seeding: ['Team 1', 'Team 2', 'Team 3', 'Team 4'],
+            settings: {
+                size: 4,
+                roundCount: 2,
+            },
+        })).to.be.rejectedWith(/between 3 and 9/);
+    });
+
+    it('should throw if round count is greater than 9', async () => {
+        await expect(manager.create.stage({
+            name: 'Swiss Long',
+            tournamentId: 0,
+            type: 'swiss',
+            seeding: ['Team 1', 'Team 2', 'Team 3', 'Team 4'],
+            settings: {
+                size: 4,
+                roundCount: 10,
+            },
+        })).to.be.rejectedWith(/between 3 and 9/);
+    });
+
+    it('should create stage if round count is valid (e.g. 5)', async () => {
+        const stage = await manager.create.stage({
+            name: 'Swiss Valid',
+            tournamentId: 0,
+            type: 'swiss',
+            seeding: ['Team 1', 'Team 2', 'Team 3', 'Team 4'],
+            settings: {
+                size: 4,
+                roundCount: 5,
+            },
+        });
+        expect(stage).to.not.be.null;
     });
 });

@@ -205,6 +205,16 @@ export class StageCreator {
      * Only the first round is populated with matches.
      */
     private async swiss(): Promise<Stage> {
+        const settings = this.stage.settings as any;
+
+        if (settings?.roundCount !== undefined) {
+            if (!Number.isInteger(settings.roundCount))
+                throw Error('The round count must be an integer.');
+
+            if (settings.roundCount < 3 || settings.roundCount > 9)
+                throw Error('The round count must be between 3 and 9.');
+        }
+
         if (Array.isArray(this.stage.settings?.seedOrdering) &&
             this.stage.settings?.seedOrdering.length !== 1) throw Error('You must specify one seed ordering method.');
 

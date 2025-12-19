@@ -96,6 +96,15 @@ describe('Swiss System', () => {
         // We expect some matches to have opponent2 = null (BYE)
         const byeMatches = matches.filter(m => m.opponent1 === null || m.opponent2 === null);
         expect(byeMatches.length).to.be.at.least(1);
+
+        for (const match of byeMatches) {
+            if (match.opponent1 === null && match.opponent2) {
+                expect(match.opponent2.result).to.equal('win');
+            }
+            if (match.opponent2 === null && match.opponent1) {
+                expect(match.opponent1.result).to.equal('win');
+            }
+        }
     });
 
     it('should create only one round initially', async () => {
@@ -136,7 +145,10 @@ describe('Swiss System', () => {
 
             for (const match of matches) {
                 // If it's a BYE match (one opponent is null), it might be already handled or we ignore it.
-                if (match.opponent1 === null || match.opponent2 === null) continue;
+                if (match.opponent1 === null || match.opponent2 === null) {
+                    // Check if it's already simulation completed by our new logic (optional but good)
+                    continue;
+                }
 
                 // Randomly pick a winner
                 const winner = Math.random() > 0.5 ? 'opponent1' : 'opponent2';

@@ -171,10 +171,10 @@ export class BaseUpdater extends BaseGetter {
         // Don't update related matches if it's a simple score update.
         if (!statusChanged && !resultChanged) return;
 
-        if (!helpers.isRoundRobin(stage) && stage.type !== 'swiss')
+        if (!helpers.isRoundRobin(stage) && !helpers.isSwiss(stage))
             await this.updateRelatedMatches(stored, statusChanged, resultChanged);
 
-        if (stage.type === 'swiss')
+        if (helpers.isSwiss(stage))
             await this.tryNextSwissRound(stage.id, stored.round_id);
     }
 
@@ -206,7 +206,7 @@ export class BaseUpdater extends BaseGetter {
         const get = new Get(this.storage);
         const standings = await get.finalStandings(stageId, {
             type: 'swiss',
-            rankingFormula: (item) => item.wins + 0.5 * item.draws,
+            rankingFormula: (item) => 1000 * item.wins + 10 * item.scoreDifference + 1 * item.scoreFor - 1 * item.scoreAgainst,
         });
 
         const nextRoundNumber = round.number + 1;
@@ -222,8 +222,14 @@ export class BaseUpdater extends BaseGetter {
 
         for (let i = 0; i < pairings.length; i++) {
             const [op1, op2] = pairings[i];
-            const opponent1 = op1 ? { id: op1.id } : null;
-            const opponent2 = op2 ? { id: op2.id } : null;
+            const opponent1: any = op1 ? { id: op1.id } : null;
+            const opponent2: any = op2 ? { id: op2.id } : null;
+
+            if (opponent1 && !opponent2)
+                opponent1.result = 'win';
+
+            if (opponent2 && !opponent1)
+                opponent2.result = 'win';
 
             await this.storage.insert('match', {
                 stage_id: stageId,

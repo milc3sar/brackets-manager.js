@@ -115,11 +115,11 @@ export interface RoundRobinFinalStandingsItem extends RankingItem {
 }
 
 /**
- * Options for the final standings of a round-robin stage.
+ * Options for the final standings of a stage.
  */
-export interface RoundRobinFinalStandingsOptions {
+export interface FinalStandingsOptions {
     /**
-     * A formula required to rank participants in a round-robin stage.
+     * A formula required to rank participants.
      * 
      * See {@link RankingItem} for the possible properties on `item`.
      * 
@@ -128,11 +128,24 @@ export interface RoundRobinFinalStandingsOptions {
      * @example (item) => 3 * item.wins + 1 * item.draws + 0 * item.losses
      */
     rankingFormula: RankingFormula,
+
+    type: 'round_robin' | 'swiss',
+}
+
+/**
+ * Options for the final standings of a round-robin stage.
+ */
+export interface RoundRobinFinalStandingsOptions extends FinalStandingsOptions {
     /**
      * The maximum number of participants to qualify per group.
      */
     maxQualifiedParticipantsPerGroup?: number,
 }
+
+/**
+ * Options for the final standings of a swiss stage.
+ */
+export interface SwissFinalStandingsOptions extends FinalStandingsOptions { }
 
 /**
  * Contains the losers and the winner of the bracket.

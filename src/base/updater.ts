@@ -204,7 +204,10 @@ export class BaseUpdater extends BaseGetter {
 
         // Generate next round
         const get = new Get(this.storage);
-        const standings = await get.finalStandings(stageId);
+        const standings = await get.finalStandings(stageId, {
+            type: 'swiss',
+            rankingFormula: (item) => item.wins + 0.5 * item.draws,
+        });
 
         const nextRoundNumber = round.number + 1;
         const pairings = helpers.makeSwissMatches(standings, nextRoundNumber);

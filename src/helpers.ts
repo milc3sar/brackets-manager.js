@@ -127,6 +127,58 @@ export function makeRoundRobinDistribution<T>(participants: T[]): [T, T][][] {
 }
 
 /**
+ * Generates the matches of a round in swiss.
+ *
+ * @param participants The participants to pair.
+ * @param roundNumber The number of the round.
+ */
+export function makeSwissMatches<T>(participants: T[], roundNumber: number): [T, T][] {
+    // Round 1: Top half vs Bottom half (1 vs N/2+1, ...)
+    if (roundNumber === 1) {
+        const half = Math.ceil(participants.length / 2);
+        const top = participants.slice(0, half);
+        const bottom = participants.slice(half);
+
+        const matches: [T, T][] = [];
+        for (let i = 0; i < bottom.length; i++) {
+            matches.push([top[i], bottom[i]]);
+        }
+
+        return matches;
+    }
+
+    // Round > 1: Neighbor pairing (High points vs High points)
+    // Assumes participants are already sorted by score/rank.
+    // 1 vs 2, 3 vs 4, ...
+    const matches: [T, T][] = [];
+    for (let i = 0; i < participants.length; i += 2) {
+        if (i + 1 < participants.length) {
+            matches.push([participants[i], participants[i + 1]]);
+        } else {
+            // Odd number of participants, last one is left over.
+            // In a real system, this should be a BYE.
+            // But makeSwissMatches returns pairs.
+            // We can return [participant, null] but T doesn't include null necessarily.
+            // However, call sites usually pass ParticipantSlot which is T | null.
+            // Let's blindly cast.
+            matches.push([participants[i], null as unknown as T]);
+        }
+    }
+
+    return matches;
+}
+
+
+/**
+ * Checks if a stage is a swiss stage.
+ *
+ * @param stage The stage to check.
+ */
+export function isSwiss(stage: Stage): boolean {
+    return stage.type === 'swiss' as StageType;
+}
+
+/**
  * A helper to assert our generated round-robin is correct.
  *
  * @param input The input seeding.
@@ -1808,8 +1860,8 @@ export function ensureNotRoundRobin(stage: Stage): void {
  * 
  * Please do something like `matches.every(m => isMatchCompleted(m))` instead.
  */
-export function isRoundCompleted(roundMatches: Match[]): boolean {
-    return roundMatches.every(match => match.status >= Status.Completed);
+export function isRoundCompleted(roundMatches: Omit<MatchResults, 'status'>[]): boolean {
+    return roundMatches.every(match => isMatchCompleted(match));
 }
 
 /**

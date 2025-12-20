@@ -273,7 +273,7 @@ export class Get extends BaseGetter {
             name: helpers.findParticipant(participants, item).name,
         }));
 
-        return unsortedRanking.sort((a, b) => b.rank - a.rank);
+        return unsortedRanking.sort((a, b) => a.rank - b.rank);
     }
 
     /**

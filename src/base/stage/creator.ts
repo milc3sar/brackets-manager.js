@@ -240,7 +240,8 @@ export class StageCreator {
         const ordered = ordering[method](slots);
 
         // We only create matches for Round 1
-        const duels = helpers.makeSwissMatches(ordered, 1);
+        const nonNullSlots = ordered.filter(helpers.isDefined);
+        const duels = helpers.makeSwissMatches(nonNullSlots as { id: number }[], 1);
         await this.createRound(stage.id, groupId, 1, duels.length, duels);
 
         // We create subsequent rounds but EMPTY (matches will be created as "TBD vs TBD" or just empty matches?)

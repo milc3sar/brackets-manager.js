@@ -209,8 +209,13 @@ export class BaseUpdater extends BaseGetter {
             rankingFormula: (item) => 1000 * item.wins + 10 * item.scoreDifference + 1 * item.scoreFor - 1 * item.scoreAgainst,
         });
 
+        const stageMatches = await this.storage.select('match', { stage_id: stageId });
+        const receivedBye = stageMatches?.filter(m => m.opponent1 === null || m.opponent2 === null)
+            .map(m => m.opponent1 === null ? m.opponent2?.id : m.opponent1?.id)
+            .filter(helpers.isDefined) || [];
+
         const nextRoundNumber = round.number + 1;
-        const pairings = helpers.makeSwissMatches(standings, nextRoundNumber);
+        const pairings = helpers.makeSwissMatches(standings, nextRoundNumber, receivedBye);
 
         const nextRoundId = await this.storage.insert('round', {
             stage_id: stageId,

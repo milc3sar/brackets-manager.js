@@ -132,7 +132,7 @@ export function makeRoundRobinDistribution<T>(participants: T[]): [T, T][][] {
  * @param participants The participants to pair.
  * @param roundNumber The number of the round.
  */
-export function makeSwissMatches<T>(participants: T[], roundNumber: number): [T, T][] {
+export function makeSwissMatches<T extends { id: Id }>(participants: T[], roundNumber: number, receivedBye: Id[] = []): [T, T][] {
     // Round 1: Top half vs Bottom half (1 vs N/2+1, ...)
     if (roundNumber === 1) {
         const half = Math.ceil(participants.length / 2);
@@ -144,25 +144,42 @@ export function makeSwissMatches<T>(participants: T[], roundNumber: number): [T,
             matches.push([top[i], bottom[i]]);
         }
 
+        if (top.length > bottom.length) {
+            matches.push([top[top.length - 1], null as unknown as T]);
+        }
+
         return matches;
     }
 
     // Round > 1: Neighbor pairing (High points vs High points)
     // Assumes participants are already sorted by score/rank.
-    // 1 vs 2, 3 vs 4, ...
     const matches: [T, T][] = [];
-    for (let i = 0; i < participants.length; i += 2) {
-        if (i + 1 < participants.length) {
-            matches.push([participants[i], participants[i + 1]]);
-        } else {
-            // Odd number of participants, last one is left over.
-            // In a real system, this should be a BYE.
-            // But makeSwissMatches returns pairs.
-            // We can return [participant, null] but T doesn't include null necessarily.
-            // However, call sites usually pass ParticipantSlot which is T | null.
-            // Let's blindly cast.
-            matches.push([participants[i], null as unknown as T]);
+    const remaining = [...participants];
+
+    if (remaining.length % 2 === 1) {
+        // Find the lowest ranked participant who hasn't received a BYE yet.
+        let byeIndex = -1;
+        for (let i = remaining.length - 1; i >= 0; i--) {
+            const p = remaining[i];
+            // Check if this participant already received a BYE
+            if (!receivedBye.includes(p.id)) {
+                byeIndex = i;
+                break;
+            }
         }
+
+        if (byeIndex === -1) {
+            // All have received a BYE? Should be rare/impossible in standard Swiss if rounds <= log2(N), but fallback to last.
+            byeIndex = remaining.length - 1;
+        }
+
+        const byeParticipant = remaining[byeIndex];
+        remaining.splice(byeIndex, 1);
+        matches.push([byeParticipant, null as unknown as T]);
+    }
+
+    for (let i = 0; i < remaining.length; i += 2) {
+        matches.push([remaining[i], remaining[i + 1]]);
     }
 
     return matches;

@@ -74,7 +74,7 @@ describe('Swiss System', () => {
         });
 
         const matches = await storage.select('match', { stage_id: stage.id });
-        expect(matches.length).to.equal(4); // 4 pairings for 8 slots
+        expect(matches.length).to.equal(3); // 5 participants -> 2 matches + 1 BYE match
 
         // With 5 participants and balanceByes:
         // Seeding becomes: [T1, T2, T3, T4, T5, null, null, null] (depending on balanceByes implementation)
@@ -213,6 +213,57 @@ describe('Swiss System', () => {
             },
         })).to.be.rejectedWith(/between 3 and 9/);
     });
+
+    it('should not give a BYE to the same participant twice', async () => {
+        // 5 participants -> rounds = ceil(log2(5)) = 3.
+        // Round 1: 1 Bye (likely Team 5)
+        // Round 2: 1 Bye (should NOT be Team 5 again)
+        // Round 3: 1 Bye (should NOT be Team 5 again, nor the one from Round 2)
+
+        const stage = await manager.create.stage({
+            name: 'Swiss Byes',
+            tournamentId: 0,
+            type: 'swiss',
+            seeding: ['Team 1', 'Team 2', 'Team 3', 'Team 4', 'Team 5'],
+            settings: { size: 8, balanceByes: true },
+        });
+
+        const byesGivenTo = new Set();
+
+        const playRound = async (roundNumber) => {
+            const group = await storage.selectFirst('group', { stage_id: stage.id });
+            const round = await storage.selectFirst('round', { group_id: group.id, number: roundNumber });
+            const matches = await storage.select('match', { round_id: round.id });
+
+            for (const match of matches) {
+                // Check if it's a BYE
+                if (match.opponent1 === null && match.opponent2) {
+                    byesGivenTo.add(match.opponent2.id);
+                } else if (match.opponent2 === null && match.opponent1) {
+                    byesGivenTo.add(match.opponent1.id);
+                }
+
+                // Complete the match
+                if (match.opponent1 !== null && match.opponent2 !== null) {
+                    const winner = Math.random() > 0.5 ? 'opponent1' : 'opponent2';
+                    await manager.update.match({
+                        id: match.id,
+                        opponent1: { result: winner === 'opponent1' ? 'win' : 'loss' },
+                        opponent2: { result: winner === 'opponent2' ? 'win' : 'loss' },
+                    });
+                }
+            }
+        };
+
+        await playRound(1);
+        await playRound(2);
+        await playRound(3);
+
+        // We have had 3 rounds with odd participants (5).
+        // There should be 3 unique participants who got a BYE.
+        expect(byesGivenTo.size).to.equal(3);
+    });
+
 
     it('should create stage if round count is valid (e.g. 5)', async () => {
         const stage = await manager.create.stage({
